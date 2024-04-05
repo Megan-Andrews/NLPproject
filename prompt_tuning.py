@@ -131,9 +131,12 @@ class CounselingDataset(Dataset):
     def __getitem__(self, idx):
         context = self.texts[idx]
         response = self.responses[idx]
+        prompt = "Provide counseling, suggestions and emotiona support for this person:"#"Provide suggestions, affirmations or reflection of feelings for the following person's needs. "
+
+        #print(context, "\n\n",response)
         # Tokenize the processed chat
         inputs = self.tokenizer(
-            context,
+            prompt +context,
             add_special_tokens=True,
             max_length=self.max_len,
             padding="max_length",
@@ -185,8 +188,8 @@ def read_data():
     prompt_tuning_init_text=prompt_tuning_init_text,
     tokenizer_name_or_path="t5-small",
     )
-    model = get_peft_model(model, peft_config)
-    model.print_trainable_parameters()
+    #model = get_peft_model(model, peft_config)
+    #model.print_trainable_parameters()
     # tokenizer = BartTokenizer.from_pretrained('facebook/bart-base')
     # model = BartForConditionalGeneration.from_pretrained('facebook/bart-base')
 
@@ -231,23 +234,35 @@ def read_data():
             optimizer.zero_grad()
 
             outputs = model(input_ids, attention_mask=attention_mask, labels=labels)
-
-            if batch_idx == 10:
-                output_token_ids = model.generate(input_ids=input_ids, attention_mask=attention_mask)
-                decoded_texts = [tokenizer.decode(ids, skip_special_tokens=True) for ids in output_token_ids]
-                for text in decoded_texts:
-                    print(text)
-                decoded_labels = [tokenizer.decode(ids, skip_special_tokens=True) for ids in labels]
-                for label in decoded_labels:
-                    print(label)
-                break
+            # print(dataset["Context"][0])
+            inputs = tokenizer(dataset["Context"][0], return_tensors="pt")
+            # print(inputs)
+           
+            # if batch_idx == 10:
+            #     print(model.base_model.prepare_inputs_for_generation)
+            #     output_token_ids = model.generate(input_ids=inputs["input_ids"].to(device), attention_mask=inputs["attention_mask"].to(device))
+            #     decoded_texts = [tokenizer.decode(ids, skip_special_tokens=True) for ids in output_token_ids]
+            #     for text in decoded_texts:
+            #         print("Context \n", text)
+            #     decoded_labels = [tokenizer.decode(ids, skip_special_tokens=True) for ids in labels]
+            #     for label in decoded_labels:
+            #         print("Predicted Response \n",  label)
+            #     print("Real Response \n", dataset["Response"][0])
+            #     break
 
             loss = outputs.loss
-            
-            
             total_loss += loss.item()
 
-            
+        inputs = tokenizer(dataset["Context"][0], return_tensors="pt")
+        #print(model.base_model.prepare_inputs_for_generation)
+        output_token_ids = model.generate(input_ids=inputs["input_ids"].to(device), attention_mask=inputs["attention_mask"].to(device))
+        decoded_texts = [tokenizer.decode(ids, skip_special_tokens=True) for ids in output_token_ids]
+        print("Context \n", dataset["Context"][0])
+        decoded_labels = [tokenizer.decode(ids, skip_special_tokens=True) for ids in labels]
+        for label in decoded_labels:
+            print("Predicted Response \n",  label)
+        print("Real Response \n", dataset["Response"][0])
+          
         avg_train_loss = total_loss / len(train_loader)
 
         print(f'Epoch {epoch + 1}/{epochs}, Training Loss: {avg_train_loss:.4f}')
